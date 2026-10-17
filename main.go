@@ -1,10 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 )
+
+type Catalog struct {
+	CatalogVersion string `json:"catalogVersion"`
+	DateReleased   string `json:"dateReleased"`
+	Count          int    `json:"count"`
+}
 
 func main() {
 
@@ -24,8 +31,18 @@ func main() {
 		return
 	}
 
-	fmt.Println("tamanho da resposta:", len(body), "bytes")
-	fmt.Println("Inicio da resposta:")
-	fmt.Println(string(body[:200]))
+	var catalog Catalog
+
+	err = json.Unmarshal(body, &catalog)
+
+	if err != nil {
+		fmt.Println("Erro ao interpretar o Json:", err)
+		return
+	}
+
+	fmt.Println("=== CISA KEV Catalog ===")
+	fmt.Println("Versão:", catalog.CatalogVersion)
+	fmt.Println("Publicado em:", catalog.DateReleased)
+	fmt.Println("Vulnerabilidades:", catalog.Count)
 
 }
