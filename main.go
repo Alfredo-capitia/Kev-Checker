@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"time"
 )
 
@@ -33,6 +34,12 @@ func main() {
 	}
 
 	targetCVE := os.Args[1]
+
+	if !validateCVE(targetCVE) {
+		fmt.Println("Erro: formato de CVE inválido.")
+		fmt.Println("Exemplo: CVE-2021-44228")
+		return
+	}
 
 	client := &http.Client{
 		Timeout: 10 * time.Second,
@@ -92,4 +99,14 @@ func findCVE(vulnerabilities []Vulnerability, targetCVE string) (Vulnerability, 
 	}
 
 	return Vulnerability{}, false
+}
+func validateCVE(cveID string) bool {
+	pattern := `^CVE-[0-9]{4}-[0-9]{4,}$`
+
+	matched, err := regexp.MatchString(pattern, cveID)
+	if err != nil {
+		return false
+	}
+
+	return matched
 }
