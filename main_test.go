@@ -56,3 +56,32 @@ func TestFindCVEEmptyCatalog(t *testing.T) {
 		t.Fatal("não esperava encontrar uma CVE num catálogo vazio")
 	}
 }
+
+func TestValidateCVE(t *testing.T) {
+	tests := []struct {
+		name  string
+		cveID string
+		want  bool
+	}{
+		{"CVE válida", "CVE-2021-44228", true},
+		{"prefixo inválido", "abc", false},
+		{"ano incompleto", "CVE-123-44228", false},
+		{"sequência curta", "CVE-2021-123", false},
+		{"sem prefixo", "2021-44228", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := validateCVE(tt.cveID)
+
+			if got != tt.want {
+				t.Errorf(
+					"validateCVE(%q) = %t; esperado %t",
+					tt.cveID,
+					got,
+					tt.want,
+				)
+			}
+		})
+	}
+}
