@@ -4,21 +4,47 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"os"
+	"time"
 )
 
+const catalogURL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+
+type Vulnerability struct {
+	CVEID         string `json:"cveID"`
+	VendorProject string `json:"vendorProject"`
+	Product       string `json:"product"`
+	DateAdded     string `json:"dateAdded"`
+}
+
 type Catalog struct {
-	CatalogVersion string `json:"catalogVersion"`
-	DateReleased   string `json:"dateReleased"`
-	Count          int    `json:"count"`
+	CatalogVersion  string          `json:"catalogVersion"`
+	Count           int             `json:"count"`
+	Vulnerabilities []Vulnerability `json:"vulnerabilities"`
 }
 
 func main() {
 
-	url := "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
-	response, err := http.Get(url)
+	if len(os.Args) < 2 {
+		fmt.Println("Uso: go run . <CVE-ID>")
+		return
+	}
+
+	targetCVE := os.Args[1]
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	response, err := client.Get(catalogURL)
 	if err != nil {
-		fmt.Println("erro ao consultar a CISA", err)
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			fmt.Println("Erro: o pedido à CISA excedeu o limite de 10 segundos.")
+			return
+		}
+
+		fmt.Println("Erro ao consultar a CISA:", err)
 		return
 	}
 	defer response.Body.Close()
@@ -42,7 +68,28 @@ func main() {
 
 	fmt.Println("=== CISA KEV Catalog ===")
 	fmt.Println("Versão:", catalog.CatalogVersion)
-	fmt.Println("Publicado em:", catalog.DateReleased)
 	fmt.Println("Vulnerabilidades:", catalog.Count)
 
+	vuln, found := findCVE(catalog.Vulnerabilities, targetCVE)
+
+	if !found {
+		fmt.Println("\nCVE não encontrada no catálogo:", targetCVE)
+		return
+	}
+
+	fmt.Println("\n[ENCONTRADA NO KEV]")
+	fmt.Println("CVE:", vuln.CVEID)
+	fmt.Println("Fornecedor:", vuln.VendorProject)
+	fmt.Println("Produto:", vuln.Product)
+	fmt.Println("Data de inclusão:", vuln.DateAdded)
+}
+
+func findCVE(vulnerabilities []Vulnerability, targetCVE string) (Vulnerability, bool) {
+	for _, vuln := range vulnerabilities {
+		if vuln.CVEID == targetCVE {
+			return vuln, true
+		}
+	}
+
+	return Vulnerability{}, false
 }
