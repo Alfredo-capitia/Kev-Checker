@@ -49,3 +49,10 @@ func TestFindCVE(t *testing.T) {
 		})
 	}
 }
+func TestFindCVEEmptyCatalog(t *testing.T) {
+	_, found := findCVE(nil, "CVE-2021-44228")
+
+	if found {
+		t.Fatal("não esperava encontrar uma CVE num catálogo vazio")
+	}
+}
