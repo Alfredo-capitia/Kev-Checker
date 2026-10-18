@@ -27,10 +27,13 @@ type Catalog struct {
 }
 
 func main() {
+	os.Exit(run())
+}
 
+func run() int {
 	if len(os.Args) != 2 {
 		fmt.Println("Uso: go run . <CVE-ID>")
-		return
+		return 1
 	}
 
 	targetCVE := os.Args[1]
@@ -38,39 +41,43 @@ func main() {
 	if !validateCVE(targetCVE) {
 		fmt.Println("Erro: formato de CVE inválido.")
 		fmt.Println("Exemplo: CVE-2021-44228")
-		return
+		return 1
 	}
 
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
+
 	response, err := client.Get(catalogURL)
 	if err != nil {
 		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
 			fmt.Println("Erro: o pedido à CISA excedeu o limite de 10 segundos.")
-			return
+			return 1
 		}
 
 		fmt.Println("Erro ao consultar a CISA:", err)
-		return
+		return 1
 	}
 	defer response.Body.Close()
 
-	fmt.Println("Status HTTP: ", response.Status)
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		fmt.Println("Erro: a CISA respondeu com status HTTP:", response.Status)
+		return 1
+	}
+
+	fmt.Println("Status HTTP:", response.Status)
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		fmt.Println("erro ao ler a resposta: ", err)
-		return
+		fmt.Println("Erro ao ler a resposta:", err)
+		return 1
 	}
 
 	var catalog Catalog
 
-	err = json.Unmarshal(body, &catalog)
-
-	if err != nil {
-		fmt.Println("Erro ao interpretar o Json:", err)
-		return
+	if err := json.Unmarshal(body, &catalog); err != nil {
+		fmt.Println("Erro ao interpretar o JSON:", err)
+		return 1
 	}
 
 	fmt.Println("=== CISA KEV Catalog ===")
@@ -78,10 +85,9 @@ func main() {
 	fmt.Println("Vulnerabilidades:", catalog.Count)
 
 	vuln, found := findCVE(catalog.Vulnerabilities, targetCVE)
-
 	if !found {
 		fmt.Println("\nCVE não encontrada no catálogo:", targetCVE)
-		return
+		return 1
 	}
 
 	fmt.Println("\n[ENCONTRADA NO KEV]")
@@ -89,6 +95,8 @@ func main() {
 	fmt.Println("Fornecedor:", vuln.VendorProject)
 	fmt.Println("Produto:", vuln.Product)
 	fmt.Println("Data de inclusão:", vuln.DateAdded)
+
+	return 0
 }
 
 func findCVE(vulnerabilities []Vulnerability, targetCVE string) (Vulnerability, bool) {
@@ -100,6 +108,7 @@ func findCVE(vulnerabilities []Vulnerability, targetCVE string) (Vulnerability, 
 
 	return Vulnerability{}, false
 }
+
 func validateCVE(cveID string) bool {
 	pattern := `^CVE-[0-9]{4}-[0-9]{4,}$`
 
